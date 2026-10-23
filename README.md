@@ -25,6 +25,7 @@ The agent never sends, pays or signs anything on your behalf: it prepares, asks,
 ## How Cominty is integrated
 
 - **Managed Agent** "City Planner" (definition in `city-planner.agent.json`): Claude Sonnet 5 with GPT and Gemini failovers, web search, image generation, memory, subagents, workflows, second opinion, Google Calendar and DataGouv integrations.
+- **Managed Agent** "Data Analyst": pulls official data (DataGouv), runs the numbers in code, has the figures checked by a second opinion and delivers a chart-ready CSV plus a report. Its robots work at the **Data Observatory (La Défense)** and the CSV is drawn as a chart on your desk. Pick it with *Send to → Data Analyst*.
 - **Python SDK** (`cominty-sdk`) in `server.py`:
   - `chat.start` / `chat.send` to run missions and answer the agent's questions in the same thread,
   - streaming **progress events** (`llm`, `tool_call`, `intermediary_update`, `result`) forwarded to the browser over SSE,

@@ -14,14 +14,15 @@ const TAU = Math.PI * 2;
 // Each landmark is one Cominty capability, placed on one of the 8 avenues of an
 // Étoile-style star around the Eiffel Tower (the City Planner's HQ).
 export const BUILDINGS = {
-  studio:   { name: 'Art Studio',     place: 'Montmartre',             cap: 'Image generation',     icon: '🎨', color: 0xff8a65, angle: 0,    build: 'sacre' },
-  writers:  { name: "Writers' Café",  place: 'Saint-Germain',          cap: 'Files & drafts',       icon: '✍️', color: 0xffd166, angle: 45,   build: 'cafe' },
+  studio:   { name: 'Art Studio',     place: 'Montmartre',             cap: 'Image generation',     icon: '🎨', color: 0xff8a65, angle: 10,   build: 'sacre' },
+  writers:  { name: "Writers' Café",  place: 'Saint-Germain',          cap: 'Files & drafts',       icon: '✍️', color: 0xffd166, angle: 50,   build: 'cafe' },
   home:     { name: 'Your Desk',      place: 'Le Marais',              cap: 'You',                  icon: '🏠', color: 0xfff1d6, angle: 90,   build: 'home' },
-  workshop: { name: 'Workshop',       place: 'Centre Pompidou',        cap: 'Integrations · tools', icon: '🛠️', color: 0x7fb8ff, angle: 135,  build: 'pompidou' },
-  library:  { name: 'Library',        place: 'Panthéon · Quartier Latin', cap: 'Web search',        icon: '🔎', color: 0x5fb4ff, angle: 180,  build: 'pantheon' },
-  archive:  { name: 'Archive',        place: 'Louvre',                 cap: 'Reads documents',      icon: '🗂️', color: 0x8bd3c7, angle: -135, build: 'louvre' },
-  vault:    { name: 'Memory Vault',   place: 'Arc de Triomphe',        cap: 'Memory',               icon: '🧠', color: 0x6be3bf, angle: -90,  build: 'arc' },
-  townhall: { name: 'Town Hall',      place: 'Hôtel de Ville',         cap: 'Review · 2nd opinion', icon: '⚖️', color: 0xc792ea, angle: -45,  build: 'hdv' },
+  workshop: { name: 'Workshop',       place: 'Centre Pompidou',        cap: 'Integrations · tools', icon: '🛠️', color: 0x7fb8ff, angle: 130,  build: 'pompidou' },
+  library:  { name: 'Library',        place: 'Panthéon · Quartier Latin', cap: 'Web search',        icon: '🔎', color: 0x5fb4ff, angle: 170,  build: 'pantheon' },
+  archive:  { name: 'Archive',        place: 'Louvre',                 cap: 'Reads documents',      icon: '🗂️', color: 0x8bd3c7, angle: -150, build: 'louvre' },
+  vault:    { name: 'Memory Vault',   place: 'Arc de Triomphe',        cap: 'Memory',               icon: '🧠', color: 0x6be3bf, angle: -110, build: 'arc' },
+  townhall: { name: 'Town Hall',      place: 'Hôtel de Ville',         cap: 'Review · 2nd opinion', icon: '⚖️', color: 0xc792ea, angle: -70,  build: 'hdv' },
+  observatory: { name: 'Data Observatory', place: 'La Défense',        cap: 'Data analysis · code', icon: '📊', color: 0x3fc1d9, angle: -30,  build: 'observatory' },
 };
 
 const RING = 40;        // landmark centres
@@ -186,6 +187,12 @@ function makeProp(role, s, color) {
     case 'Operator': // wrench
       add(new THREE.BoxGeometry(0.05 * s, 0.32 * s, 0.04 * s), M(0x9aa5b1), 0, 0.12, 0.05);
       add(new THREE.TorusGeometry(0.06 * s, 0.025 * s, 6, 12, Math.PI * 1.5), M(0x9aa5b1), 0, 0.3, 0.05);
+      break;
+    case 'Analyst': // tablet with a tiny bar chart
+      add(new THREE.BoxGeometry(0.34 * s, 0.26 * s, 0.03 * s), M(0x22303a), 0, 0.12, 0.1);
+      add(new THREE.BoxGeometry(0.05 * s, 0.08 * s, 0.035 * s), M(0x6be3bf, 0.8), -0.09, 0.08, 0.11);
+      add(new THREE.BoxGeometry(0.05 * s, 0.13 * s, 0.035 * s), M(0xffd166, 0.8), 0, 0.105, 0.11);
+      add(new THREE.BoxGeometry(0.05 * s, 0.18 * s, 0.035 * s), M(0x3fc1d9, 0.8), 0.09, 0.13, 0.11);
       break;
     case 'Planner': // little star wand
       add(new THREE.CylinderGeometry(0.02 * s, 0.02 * s, 0.3 * s, 6), M(0xd8b25a), 0, 0.1, 0.05);
@@ -631,8 +638,9 @@ export class City {
     this.scene.add(inner);
     // hedges on the garden edge
     const hedgeMat = new THREE.MeshStandardMaterial({ color: 0x3f6b37, roughness: 1 });
-    for (let i = 0; i < 8; i++) {
-      const a0 = THREE.MathUtils.degToRad(i * 45 + 9), a1 = THREE.MathUtils.degToRad(i * 45 + 36);
+    for (let i = 0; i < 9; i++) {
+      // one hedge in each gap between the 9 avenues (avenues at 10° + 40°·k)
+      const a0 = THREE.MathUtils.degToRad(-(42 + i * 40)), a1 = a0 + THREE.MathUtils.degToRad(24);
       const geo = new THREE.TorusGeometry(PLAZA_R - 0.9, 0.45, 6, 24, a1 - a0);
       const hedge = new THREE.Mesh(geo, hedgeMat);
       hedge.rotation.x = -Math.PI / 2; hedge.rotation.z = a0; hedge.position.y = 0.4; hedge.scale.z = 1.4;
@@ -1024,6 +1032,31 @@ export class City {
         const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), M.lampHead); lamp.position.set(2, 2.1, 6.2); g.add(lamp);
         const dl = new THREE.PointLight(0xffc070, 6, 10, 2); dl.position.set(2, 2.6, 6.2); g.add(dl);
         height = 16; depth = 12;
+        break;
+      }
+      case 'observatory': {
+        // glass tower with a domed observatory on top, data-bar towers and a dish beside it
+        this._box(g, 12, 1, 12, M.stoneDark, 0, 0, -1);
+        const glassTower = new THREE.MeshStandardMaterial({ color: 0x9cc6d8, roughness: 0.08, metalness: 0.55, emissive: 0x3fc1d9, emissiveIntensity: 0.12 });
+        this._box(g, 8, 20, 8, glassTower, 0, 1, -2);
+        const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(8, 20, 8, 1, 6, 1)), new THREE.LineBasicMaterial({ color: 0xe8f4f8 }));
+        frame.position.set(0, 11, -2); g.add(frame);
+        this._box(g, 9, 1, 9, M.white, 0, 21, -2);
+        const domeObs = new THREE.Mesh(new THREE.SphereGeometry(3.6, 28, 14, 0, TAU, 0, Math.PI / 2), M.white);
+        domeObs.position.set(0, 22, -2); domeObs.castShadow = true; g.add(domeObs);
+        const slit = new THREE.Mesh(new THREE.BoxGeometry(0.9, 3.4, 4.2), new THREE.MeshStandardMaterial({ color: 0x1b2a33 }));
+        slit.position.set(0, 23.6, -0.6); slit.rotation.x = -0.5; g.add(slit);
+        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 3.6, 12), M.iron);
+        scope.position.set(0, 25.2, 0.4); scope.rotation.x = 0.9; g.add(scope);
+        const barCols = [0x3fc1d9, 0x6be3bf, 0xffd166, 0xff8a65];
+        [4, 7, 10, 13].forEach((h, i) => {
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(1.5, h, 1.5), new THREE.MeshStandardMaterial({ color: barCols[i], emissive: barCols[i], emissiveIntensity: 0.35, roughness: 0.4 }));
+          bar.position.set(5.6 + (i % 2) * 0, h / 2 + 1, 3.2 - i * 2); bar.castShadow = true; g.add(bar);
+        });
+        const dish = new THREE.Mesh(new THREE.SphereGeometry(2, 20, 10, 0, TAU, 0, Math.PI / 2.6), M.white);
+        dish.material = M.white; dish.position.set(-5.4, 3.2, 3); dish.rotation.set(-1.1, 0, 0.5); dish.castShadow = true; g.add(dish);
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 3, 8), M.iron); mast.position.set(-5.4, 1.5, 3); g.add(mast);
+        height = 27; depth = 12;
         break;
       }
       case 'pompidou': {

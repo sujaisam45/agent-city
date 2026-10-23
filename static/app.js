@@ -9,11 +9,19 @@ applyShift();
 window.addEventListener('resize', applyShift);
 window.city = city; // handy for debugging in the console
 
-const EXAMPLES = [
-  "I'm moving to Rouen in January for NEOMA. Compare 3 neighbourhoods and write the email to landlords.",
-  'I just arrived in France as an international student. Make my first-month admin plan: bank account, CAF housing aid, health insurance and residence permit, with deadlines.',
-  'Plan my first weekend in Rouen on a €50 student budget and make a one-page visual guide.',
-];
+const EXAMPLES = {
+  planner: [
+    "I'm moving to Rouen in January for NEOMA. Compare 3 neighbourhoods and write the email to landlords.",
+    'I just arrived in France as an international student. Make my first-month admin plan: bank account, CAF housing aid, health insurance and residence permit, with deadlines.',
+    'Plan my first weekend in Rouen on a €50 student budget and make a one-page visual guide.',
+  ],
+  analyst: [
+    'Which Rouen neighbourhood fits a €600 studio budget? Use official rent data and chart rent per m² by area.',
+    'Compare the monthly cost of living for a student in Rouen, Lyon and Paris, and chart it.',
+    'How much housing aid (APL) could a student get for a €550 studio in Rouen? Show the calculation.',
+  ],
+};
+const AGENT_LABEL = { planner: 'City Planner', analyst: 'Data Analyst' };
 
 // Who does what: tool name → role, building, colour.
 const ROLES = {
@@ -27,6 +35,7 @@ const ROLES = {
   Keeper:     { color: 0x6be3bf, icon: '🧠' },
   Courier:    { color: 0xf2a65a, icon: '📦' },
   Operator:   { color: 0x9aa5b1, icon: '🛠️' },
+  Analyst:    { color: 0x3fc1d9, icon: '📊' },
 };
 
 function classify(tool = '', text = '') {
@@ -34,10 +43,12 @@ function classify(tool = '', text = '') {
   const s = `${t} ${text.toLowerCase()}`;
   if (/sub.?agent|delegat|spawn|handoff|workflow|phase|second.?opinion|^task$|^agent/.test(t) || /^(researcher|reviewer)\b/i.test(text)) {
     if (/review|check|verif|opinion|critic|audit/.test(s)) return { role: 'Reviewer', building: 'townhall', sub: true };
-    if (/calendar|event|invite|notion|slack|datagouv|integration/.test(s)) return { role: 'Operator', building: 'workshop', sub: true };
+    if (/calendar|event|invite|notion|slack|integration/.test(s)) return { role: 'Operator', building: 'workshop', sub: true };
+    if (/analy|compute|calculat|statistic|dataset|chart/.test(s)) return { role: 'Analyst', building: 'observatory', sub: true };
     return { role: 'Researcher', building: 'library', sub: true };
   }
-  if (/calendar|event|invite|notion|slack|datagouv|data_gouv|dataset|gamma|mcp|integration/.test(s) && !/search_web/.test(t)) return { role: 'Operator', building: 'workshop' };
+  if (/python|code|execute|sandbox|bash|shell|analy|compute|chart|plot|pandas|sql|query|datagouv|data_gouv|dataset|csv/.test(t)) return { role: 'Analyst', building: 'observatory' };
+  if (/calendar|event|invite|notion|slack|gamma|mcp|integration/.test(s) && !/search_web/.test(t)) return { role: 'Operator', building: 'workshop' };
   if (/present|deliver|share|export|send_file|attach/.test(t)) return { role: 'Courier', building: 'home' };
   if (/image|draw|paint|picture|illustr/.test(t)) return { role: 'Artist', building: 'studio' };
   if (/video|music|audio|sound/.test(t)) return { role: 'Producer', building: 'studio' };
@@ -53,8 +64,8 @@ function classify(tool = '', text = '') {
   return { role: 'Operator', building: 'workshop' };
 }
 
-const TAG_ICON = { PLAN: '🗺️', RESEARCH: '🔎', WRITE: '✍️', IMAGE: '🎨', REVIEW: '⚖️', ASK: '📋' };
-const TAG_BUILDING = { RESEARCH: 'library', WRITE: 'writers', IMAGE: 'studio', REVIEW: 'townhall', ASK: 'home' };
+const TAG_ICON = { PLAN: '🗺️', RESEARCH: '🔎', WRITE: '✍️', IMAGE: '🎨', REVIEW: '⚖️', ASK: '📋', DATA: '🗄️', ANALYSE: '📊', CHART: '📈' };
+const TAG_BUILDING = { RESEARCH: 'library', WRITE: 'writers', IMAGE: 'studio', REVIEW: 'townhall', ASK: 'home', DATA: 'observatory', ANALYSE: 'observatory', CHART: 'observatory' };
 
 function short(text = '', n = 72) {
   let t = String(text).replace(/^Search the web for\s+/i, '').replace(/^Search\s+/i, '').trim();
@@ -207,19 +218,63 @@ function fileKind(f) {
   if (/email|mail|message|letter/.test(n)) return 'email';
   if (/plan|schedule|timeline/.test(n)) return 'plan';
   if ((f.mimetype || '').startsWith('video/')) return 'video';
+  if (/\.csv$/.test(n) || (f.mimetype || '').includes('csv')) return 'data';
+  if (/analys|report/.test(n)) return 'report';
   return 'file';
 }
-const KIND_COLOR = { image: 0xff8a65, email: 0xffd166, plan: 0x6be3bf, video: 0xff6fa8, file: 0xfff1d6 };
+const KIND_COLOR = { image: 0xff8a65, email: 0xffd166, plan: 0x6be3bf, video: 0xff6fa8, file: 0xfff1d6, data: 0x3fc1d9, report: 0x3fc1d9 };
+
+// ---- CSV → chart (the Analyst's results.csv is drawn as a bar chart)
+function parseCSV(text) {
+  const rows = [];
+  for (const line of text.replace(/\r/g, '').split('\n')) {
+    if (!line.trim()) continue;
+    const cells = []; let cur = '', q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (q) { if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+      else if (ch === '"') q = true; else if (ch === ',' || ch === ';') { cells.push(cur.trim()); cur = ''; } else cur += ch;
+    }
+    cells.push(cur.trim()); rows.push(cells);
+  }
+  return rows;
+}
+const toNum = (v) => { const x = Number(String(v).replace(/[^0-9.,-]/g, '').replace(',', '.')); return Number.isFinite(x) && /\d/.test(String(v)) ? x : null; };
+function chartFromCSV(text) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) return null;
+  const head = rows[0], body = rows.slice(1);
+  let vc = -1;
+  for (let c = 1; c < head.length && vc < 0; c++) if (body.filter((r) => toNum(r[c]) !== null).length >= Math.max(1, body.length * 0.6)) vc = c;
+  if (vc < 0) return null;
+  const unitCol = head.findIndex((h) => /unit/i.test(h));
+  const data = body.filter((r) => toNum(r[vc]) !== null).map((r) => ({ label: r[0], value: toNum(r[vc]), unit: unitCol >= 0 ? r[unitCol] : '' })).sort((a, b) => b.value - a.value).slice(0, 14);
+  if (!data.length) return null;
+  const max = Math.max(...data.map((d) => d.value)) || 1;
+  const W = 520, lab = 150, rowH = 28, H = data.length * rowH + 30, bw = W - lab - 70;
+  const unit = data[0].unit || head[vc];
+  const bars = data.map((d, i) => {
+    const y = 10 + i * rowH, w = Math.max(2, (d.value / max) * bw);
+    return `<text x="${lab - 8}" y="${y + 17}" text-anchor="end" class="ch-l">${esc(d.label).slice(0, 22)}</text>
+      <rect x="${lab}" y="${y + 4}" width="${w}" height="${rowH - 10}" rx="5" class="${i === 0 ? 'ch-b top' : 'ch-b'}"/>
+      <text x="${lab + w + 6}" y="${y + 17}" class="ch-v">${d.value.toLocaleString('en-GB')}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="${esc(head[vc])} by ${esc(head[0])}">${bars}<text x="${lab}" y="${H - 4}" class="ch-u">${esc(unit)}</text></svg>`;
+}
 
 async function addFile(f) {
   const kind = fileKind(f);
   const card = document.createElement('div');
   card.className = 'file';
-  card.innerHTML = `${kind === 'image' && f.url ? `<img src="${esc(f.url)}" alt="">` : ''}
-    <div class="meta"><span class="k">${kind}</span><b>${esc(f.name)}</b></div>${kind !== 'image' ? '<div class="peek"></div>' : ''}`;
+  card.innerHTML = `${kind === 'image' && f.url ? `<img src="${esc(f.url)}" alt="">` : ''}${kind === 'data' ? '<div class="chart-wrap"></div>' : ''}
+    <div class="meta"><span class="k">${kind}</span><b>${esc(f.name)}</b></div>${kind !== 'image' && kind !== 'data' ? '<div class="peek"></div>' : ''}`;
   card.addEventListener('click', () => openFile(f, kind));
   $('#desk').prepend(card);
   $('#desk-empty').hidden = true;
+  if (kind === 'data' && f.url) {
+    try { const svg = chartFromCSV(await (await fetch(f.url)).text()); if (svg) card.querySelector('.chart-wrap').innerHTML = svg; else card.querySelector('.chart-wrap').remove(); } catch { /* ignore */ }
+    return;
+  }
   if (kind !== 'image' && f.url && /\.(md|txt|csv|json|html?)$/i.test(f.name)) {
     try { card.querySelector('.peek').textContent = (await (await fetch(f.url)).text()).slice(0, 260); } catch { /* ignore */ }
   }
@@ -236,7 +291,11 @@ async function openFile(f, kind) {
   else if ((f.mimetype || '').includes('pdf') || /\.pdf$/i.test(f.name)) body.innerHTML = `<iframe src="${esc(f.url)}" style="width:100%;height:70vh;border:0"></iframe>`;
   else {
     const txt = await (await fetch(f.url)).text();
-    if (/\.md$/i.test(f.name) && window.marked) body.innerHTML = window.marked.parse(txt);
+    if (kind === 'data') {
+      const svg = chartFromCSV(txt);
+      const rows = parseCSV(txt);
+      body.innerHTML = (svg ? `<div class="chart-wrap big">${svg}</div>` : '') + '<table>' + rows.map((r, i) => '<tr>' + r.map((c) => i ? `<td>${esc(c)}</td>` : `<th>${esc(c)}</th>`).join('') + '</tr>').join('') + '</table>';
+    } else if (/\.md$/i.test(f.name) && window.marked) body.innerHTML = window.marked.parse(txt);
     else { const pre = document.createElement('pre'); pre.style.whiteSpace = 'pre-wrap'; pre.textContent = txt; body.appendChild(pre); }
   }
   $('#viewer').hidden = false;
@@ -321,8 +380,8 @@ function showAsk(questions, replayNext, courier) {
 
 // ------------------------------------------------------------------ mission tracker
 const STEPS = ['understand', 'research', 'create', 'review', 'deliver'];
-const ROLE_STEP = { Scout: 'research', Researcher: 'research', Clerk: 'research', Writer: 'create', Artist: 'create', Producer: 'create', Reviewer: 'review', Courier: 'deliver', Operator: 'deliver' };
-const TAG_STEP = { PLAN: 'understand', ASK: 'understand', RESEARCH: 'research', WRITE: 'create', IMAGE: 'create', REVIEW: 'review' };
+const ROLE_STEP = { Scout: 'research', Researcher: 'research', Clerk: 'research', Writer: 'create', Artist: 'create', Producer: 'create', Reviewer: 'review', Courier: 'deliver', Operator: 'deliver', Analyst: 'create' };
+const TAG_STEP = { PLAN: 'understand', ASK: 'understand', RESEARCH: 'research', DATA: 'research', WRITE: 'create', IMAGE: 'create', ANALYSE: 'create', CHART: 'create', REVIEW: 'review' };
 const STATUS_TEXT = { idle: 'Idle', working: 'Working', waiting: 'Needs your input', done: 'Completed', error: 'Error' };
 function setMission(goal) {
   const el = $('#mission-goal');
@@ -350,7 +409,7 @@ function resetSteps() { S.stepIx = -1; document.querySelectorAll('#steps li').fo
 (() => {
   const ul = $('#legend-list');
   const items = [['⭐', 'Eiffel Tower', 'City Planner (lead agent)', 0x2fd5b5],
-    ...['library', 'archive', 'workshop', 'writers', 'studio', 'townhall', 'vault', 'home'].map((k) => [BUILDINGS[k].icon, BUILDINGS[k].name, BUILDINGS[k].cap === 'You' ? 'Questions & deliveries' : BUILDINGS[k].cap, BUILDINGS[k].color])];
+    ...['library', 'archive', 'observatory', 'workshop', 'writers', 'studio', 'townhall', 'vault', 'home'].map((k) => [BUILDINGS[k].icon, BUILDINGS[k].name, BUILDINGS[k].cap === 'You' ? 'Questions & deliveries' : BUILDINGS[k].cap, BUILDINGS[k].color])];
   for (const [icon, name, cap, color] of items) {
     const li = document.createElement('li');
     li.style.setProperty('--c', '#' + new THREE.Color(color).getHexString());
@@ -368,6 +427,7 @@ function handle(ev) {
   switch (ev.type) {
     case 'run_started':
       S.turn = (S.turn || 0) + 1; // Cominty restarts step ids every turn
+      if (ev.agent) setLeadLabel(ev.agent);
       S.threadId = ev.thread_id;
       setMode(ev.mode);
       setStatus('working'); setStep('understand');
@@ -517,7 +577,7 @@ async function send(message) {
   city.focus('hq', 52); S.lastFocus = performance.now();
   try {
     const r = await fetch('/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, thread_id: S.threadId, passcode }) });
+      body: JSON.stringify({ message, thread_id: S.threadId, passcode, agent: S.agent }) });
     const j = await r.json();
     if (r.status === 403) { store.set('agentcity-pass', null); throw new Error('Wrong passcode. Live runs are protected; press ▶ Play to watch a recorded run.'); }
     if (!r.ok) throw new Error(j.detail || j.error || r.statusText);
@@ -555,7 +615,7 @@ function reset() {
   $('#log').innerHTML = ''; $('#desk').innerHTML = ''; $('#reply').innerHTML = ''; $('#desk-count').textContent = '';
   $('#desk-empty').hidden = false; $('#ask').hidden = true; $('#composer').style.display = '';
   $('#goal').placeholder = 'Describe your mission — e.g. “Compare 3 neighbourhoods near my school and write to landlords.”';
-  setMission(''); setStatus('idle'); resetSteps();
+  setMission(''); setStatus('idle'); resetSteps(); setLeadLabel(S.agent || 'planner');
   $('#composer').classList.remove('used');
   stats(); tab('log'); city.focus('overview');
   caption('Give the agents a mission. Watch them get it done.');
@@ -582,12 +642,34 @@ $('#goal').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#composer').requestSubmit(); }
 });
 $('#goal').addEventListener('input', (e) => { e.target.style.height = 'auto'; e.target.style.height = Math.min(140, e.target.scrollHeight) + 'px'; });
-for (const ex of EXAMPLES) {
-  const b = document.createElement('button');
-  b.type = 'button'; b.textContent = ex.length > 64 ? ex.slice(0, 62) + '…' : ex; b.title = ex;
-  b.onclick = () => { $('#goal').value = ex; $('#goal').focus(); };
-  $('#chips').appendChild(b);
+S.agent = 'planner';
+function setLeadLabel(key) {
+  const el = city.planner.el.querySelector('.wl-name');
+  if (el) el.textContent = AGENT_LABEL[key] || 'City Planner';
 }
+function renderChips() {
+  const box = $('#chips');
+  box.innerHTML = '';
+  for (const ex of EXAMPLES[S.agent] || EXAMPLES.planner) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = ex.length > 64 ? ex.slice(0, 62) + '…' : ex; b.title = ex;
+    b.onclick = () => { $('#goal').value = ex; $('#goal').focus(); };
+    box.appendChild(b);
+  }
+}
+function setAgent(key) {
+  if (S.running) return;
+  if (S.agent !== key) { S.threadId = null; }
+  S.agent = key;
+  document.querySelectorAll('#agent-pick button').forEach((b) => b.classList.toggle('on', b.dataset.agent === key));
+  setLeadLabel(key);
+  renderChips();
+  $('#goal').placeholder = key === 'analyst'
+    ? 'Ask a data question, e.g. “Which Rouen area fits a €600 studio? Chart rent per m².”'
+    : 'Describe your mission, e.g. “Compare 3 neighbourhoods near my school and write to landlords.”';
+}
+document.querySelectorAll('#agent-pick button').forEach((b) => b.addEventListener('click', () => setAgent(b.dataset.agent)));
+renderChips();
 $('#btn-director').onclick = (e) => { city.director = !city.director; e.currentTarget.classList.toggle('on', city.director); };
 $('#btn-overview').onclick = () => { city.userUntil = 0; city.focus('overview'); };
 const TIMES_ORDER = ['golden', 'night', 'day'];
@@ -600,13 +682,17 @@ $('#play').onclick = () => { if (!S.running && $('#rec').value) startReplay($('#
   try {
     const cfg = await (await fetch('/api/config')).json();
     S.mode = cfg.mode;
+    for (const a of cfg.agents || []) {
+      const b = document.querySelector(`#agent-pick button[data-agent="${a.key}"]`);
+      if (b && !a.available) { b.disabled = true; b.title = `${a.name} is not connected yet: add its agent id to .env`; }
+    }
     S.locked = !!cfg.locked;
     S.recordings = cfg.recordings || [];
     setMode(cfg.mode);
     const sel = $('#rec');
     for (const r of S.recordings) {
       const o = document.createElement('option');
-      o.value = r.id; o.textContent = `${r.title} (${r.turns} turn${r.turns > 1 ? 's' : ''})`;
+      o.value = r.id; o.textContent = `${r.agent === 'analyst' ? 'Analyst · ' : ''}${r.title}`;
       sel.appendChild(o);
     }
     $('#replaybar').hidden = !S.recordings.length;

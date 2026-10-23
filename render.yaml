@@ -15,5 +15,7 @@ services:
         sync: false
       - key: COMINTY_AGENT_ID
         sync: false
+      - key: COMINTY_ANALYST_AGENT_ID
+        sync: false
       - key: AGENT_CITY_PASSCODE
         sync: false

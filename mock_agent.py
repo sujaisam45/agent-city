@@ -16,9 +16,13 @@ def _ev(**kw: Any) -> dict[str, Any]:
     return kw
 
 
-async def script(message: str, thread_id: str, answered: bool) -> AsyncIterator[dict[str, Any]]:
+async def script(message: str, thread_id: str, answered: bool, agent: str = "planner") -> AsyncIterator[dict[str, Any]]:
+    if agent == "analyst":
+        async for ev in analyst_script(thread_id):
+            yield ev
+        return
     sleep = asyncio.sleep
-    yield _ev(type="run_started", thread_id=thread_id, mode="mock")
+    yield _ev(type="run_started", thread_id=thread_id, mode="mock", agent=agent)
     yield _ev(type="sandbox", status="running", cid=1)
     await sleep(0.8)
     yield _ev(type="sandbox", status="success", cid=1)
@@ -143,3 +147,54 @@ async def script(message: str, thread_id: str, answered: bool) -> AsyncIterator[
         "3. Image — `rouen-neighbourhoods.svg`: comparison card."))
     yield _ev(type="memory", namespace="city-planner",
               items=[{"path": "/move/preferences.md", "purpose": "Budget and flat type for the Rouen move"}])
+
+
+async def analyst_script(thread_id: str) -> AsyncIterator[dict[str, Any]]:
+    """Sample Data Analyst run: parallel data gathering, computation, a checked chart-ready CSV."""
+    sleep = asyncio.sleep
+    yield _ev(type="run_started", thread_id=thread_id, mode="mock", agent="analyst")
+    yield _ev(type="sandbox", status="running", cid=1)
+    await sleep(0.6)
+    yield _ev(type="thinking", status="running", cid=2, text="Reasoning", model="mock")
+    await sleep(1.4)
+    yield _ev(type="thinking", status="success", cid=2, text="Reasoning", model="mock")
+    yield _ev(type="update", status="success", cid=3, text="[PLAN] Compare rents per m² in 5 areas around NEOMA, then size a 25 m² studio.")
+    areas = ["Mont-Saint-Aignan", "Bois-Guillaume", "Rouen Centre"]
+    cid = 10
+    for a in areas:
+        cid += 1
+        yield _ev(type="tool", status="running", cid=cid, tool="subagent", text=f"Gather official rent data for {a}")
+        await sleep(0.3)
+    for q in ["carte des loyers Seine-Maritime", "observatoire des loyers Rouen"]:
+        cid += 1
+        yield _ev(type="tool", status="running", cid=cid, tool="datagouv_search_datasets", text=f"Search data.gouv.fr for {q}")
+        await sleep(1.0)
+        yield _ev(type="tool", status="success", cid=cid, tool="datagouv_search_datasets", text=f"Search data.gouv.fr for {q}", detail="3 datasets")
+    for i, a in enumerate(areas):
+        await sleep(0.6)
+        yield _ev(type="tool", status="success", cid=11 + i, tool="subagent", text=f"Gather official rent data for {a}", detail="data saved")
+    yield _ev(type="update", status="success", cid=40, text="[ANALYSE] Computing rent per m² and a 25 m² studio cost for each area.")
+    yield _ev(type="tool", status="running", cid=41, tool="execute_code", text="Run Python: rent per m² by area")
+    await sleep(1.6)
+    yield _ev(type="tool", status="success", cid=41, tool="execute_code", text="Run Python: rent per m² by area")
+    yield _ev(type="update", status="success", cid=42, text="[CHART] Writing the chart-ready table and the report.")
+    for f in ["results.csv", "analysis.md"]:
+        yield _ev(type="tool", status="running", cid=43 if f.endswith("csv") else 44, tool="write_file", text=f"Write {f}")
+        await sleep(1.0)
+        yield _ev(type="tool", status="success", cid=43 if f.endswith("csv") else 44, tool="write_file", text=f"Write {f}")
+    yield _ev(type="update", status="success", cid=45, text="[REVIEW] A second opinion checks the numbers.")
+    yield _ev(type="tool", status="running", cid=46, tool="subagent", text="Second opinion: check the rent figures")
+    await sleep(1.4)
+    yield _ev(type="tool", status="success", cid=46, tool="subagent", text="Second opinion: check the rent figures", detail="figures confirmed")
+    files = [
+        {"id": "a1", "name": "results.csv", "mimetype": "text/csv", "url": "/mock-files/results.csv"},
+        {"id": "a2", "name": "analysis.md", "mimetype": "text/markdown", "url": "/mock-files/analysis.md"},
+    ]
+    for i, f in enumerate(files):
+        yield _ev(type="tool", status="running", cid=50 + i, tool="present_file", text=f"Present {f['name']}")
+        await sleep(0.7)
+        yield _ev(type="tool", status="success", cid=50 + i, tool="present_file", text=f"Present {f['name']}")
+    yield _ev(type="result", status="success", cost="0.31", questions=[], files=files, reply=(
+        "**Sample analysis (mock mode).** A 25 m² studio fits a €600 budget in every area except Rouen Centre.\n\n"
+        "Summary of deliverables\n1. Data — `results.csv`: rent per m² by area, ready to chart.\n"
+        "2. Report — `analysis.md`: method, table, answer, sources and caveats."))

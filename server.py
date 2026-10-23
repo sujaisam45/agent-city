@@ -36,11 +36,18 @@ load_dotenv(ROOT / ".env")
 API_KEY = os.getenv("COMINTY_API_KEY", "").strip()
 USER_ID = os.getenv("COMINTY_USER_ID", "").strip()
 AGENT_ID = os.getenv("COMINTY_AGENT_ID", "").strip()
+ANALYST_ID = os.getenv("COMINTY_ANALYST_AGENT_ID", "").strip()  # optional second agent
 MEMORY_NS = os.getenv("COMINTY_MEMORY_NAMESPACE", "city-planner").strip()
 FORCE_MOCK = os.getenv("AGENT_CITY_MOCK", "").strip() in {"1", "true", "yes"}
 # When deployed publicly, live runs (which spend Cominty credits) need this passcode.
 PASSCODE = os.getenv("AGENT_CITY_PASSCODE", "").strip()
 LIVE = bool(API_KEY and USER_ID and AGENT_ID) and not FORCE_MOCK
+# The agents Agent City can send a mission to: key -> (display name, Cominty agent id)
+AGENTS = {"planner": ("City Planner", AGENT_ID), "analyst": ("Data Analyst", ANALYST_ID)}
+
+
+def agent_available(key: str) -> bool:
+    return key in AGENTS and (not LIVE or bool(AGENTS[key][1]))
 
 REC_DIR = ROOT / "recordings"
 REC_DIR.mkdir(exist_ok=True)
@@ -119,7 +126,7 @@ class Recorder:
         if self.path.exists():
             self.session = json.loads(self.path.read_text())
         else:
-            self.session = {"thread_id": thread_id, "title": message[:80],
+            self.session = {"thread_id": thread_id, "title": message[:80], "agent": "planner",
                             "created": time.time(), "turns": []}
         self.turn = {"message": message, "events": []}
         self.session["turns"].append(self.turn)
@@ -169,7 +176,8 @@ def normalize(ev: Any) -> dict[str, Any] | None:
     return {"type": "other", "name": n, "data": data, **base}
 
 
-async def live_turn(run: Run, message: str, thread_id: str | None) -> None:
+async def live_turn(run: Run, message: str, thread_id: str | None, agent: str = "planner") -> None:
+    agent_id = AGENTS.get(agent, AGENTS["planner"])[1] or AGENT_ID
     assert client is not None
     rec: Recorder | None = None
 
@@ -180,12 +188,13 @@ async def live_turn(run: Run, message: str, thread_id: str | None) -> None:
 
     try:
         if thread_id:
-            r = await client.chat.send(thread_id, message=message, agent_id=AGENT_ID)
+            r = await client.chat.send(thread_id, message=message, agent_id=agent_id)
         else:
-            r = await client.chat.start(agent_id=AGENT_ID, message=message, name=message[:60])
+            r = await client.chat.start(agent_id=agent_id, message=message, name=message[:60])
             thread_id = str(r.thread.id)
         rec = Recorder(thread_id, message)
-        await emit({"type": "run_started", "thread_id": thread_id, "mode": "live"})
+        rec.session["agent"] = agent
+        await emit({"type": "run_started", "thread_id": thread_id, "mode": "live", "agent": agent})
 
         cost = None
         async for ev in r:
@@ -236,11 +245,11 @@ async def live_turn(run: Run, message: str, thread_id: str | None) -> None:
 # --------------------------------------------------------------------------- #
 # Mock + replay runs
 # --------------------------------------------------------------------------- #
-async def mock_turn(run: Run, message: str, thread_id: str | None) -> None:
+async def mock_turn(run: Run, message: str, thread_id: str | None, agent: str = "planner") -> None:
     answered = bool(thread_id)
     thread_id = thread_id or f"mock-{uuid.uuid4().hex[:8]}"
     try:
-        async for ev in mock_agent.script(message, thread_id, answered=answered):
+        async for ev in mock_agent.script(message, thread_id, answered=answered, agent=agent):
             await run.emit(ev)
     except Exception as exc:  # noqa: BLE001
         await run.emit({"type": "error", "message": str(exc)})
@@ -284,7 +293,7 @@ def list_recordings() -> list[dict[str, Any]]:
         try:
             s = json.loads(p.read_text())
             turns = s.get("turns", [])
-            out.append({"id": p.parent.name, "title": s.get("title", p.parent.name),
+            out.append({"id": p.parent.name, "title": s.get("title", p.parent.name), "agent": s.get("agent", "planner"),
                         "goal": turns[0]["message"] if turns else "",
                         "turns": len(s.get("turns", [])), "created": s.get("created")})
         except Exception:  # noqa: BLE001
@@ -296,6 +305,7 @@ def list_recordings() -> list[dict[str, Any]]:
 @app.get("/api/config")
 async def config() -> dict[str, Any]:
     return {"mode": "live" if LIVE else "mock", "agent_id": AGENT_ID if LIVE else None,
+            "agents": [{"key": k, "name": n, "available": agent_available(k)} for k, (n, _) in AGENTS.items()],
             "locked": bool(LIVE and PASSCODE),
             "memory_namespace": MEMORY_NS, "recordings": list_recordings()}
 
@@ -307,14 +317,17 @@ async def start_run(req: Request) -> dict[str, str]:
     if not message:
         raise HTTPException(400, "message is required")
     thread_id = body.get("thread_id") or None
+    agent = str(body.get("agent") or "planner")
+    if not agent_available(agent):
+        raise HTTPException(400, f"agent '{agent}' is not configured (add its id to .env)")
     if LIVE and PASSCODE and str(body.get("passcode", "")).strip() != PASSCODE:
         raise HTTPException(403, "passcode")
     run = Run()
     RUNS[run.id] = run
     if LIVE:
-        asyncio.create_task(live_turn(run, message, thread_id))
+        asyncio.create_task(live_turn(run, message, thread_id, agent))
     else:
-        asyncio.create_task(mock_turn(run, message, thread_id))
+        asyncio.create_task(mock_turn(run, message, thread_id, agent))
     return {"run_id": run.id}
 
 
