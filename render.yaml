@@ -1,0 +1,19 @@
+# Render blueprint: render.com → New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: agent-city
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: COMINTY_API_KEY
+        sync: false
+      - key: COMINTY_USER_ID
+        sync: false
+      - key: COMINTY_AGENT_ID
+        sync: false
+      - key: AGENT_CITY_PASSCODE
+        sync: false

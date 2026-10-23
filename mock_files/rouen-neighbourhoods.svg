@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14323a"/><stop offset="1" stop-color="#0b1418"/></linearGradient></defs>
+<rect width="800" height="1000" fill="url(#g)"/>
+<text x="400" y="110" fill="#6be3bf" font-family="Georgia, serif" font-size="30" text-anchor="middle" letter-spacing="6">SAMPLE · MOCK MODE</text>
+<text x="400" y="200" fill="#f4efe6" font-family="Georgia, serif" font-size="64" text-anchor="middle">Where to live</text>
+<text x="400" y="270" fill="#f4efe6" font-family="Georgia, serif" font-size="64" text-anchor="middle">in Rouen?</text>
+<g font-family="Helvetica, Arial, sans-serif">
+<rect x="80" y="340" width="640" height="160" rx="18" fill="#1d4a52"/><text x="110" y="410" fill="#fff" font-size="36" font-weight="700">1 · Mont-Saint-Aignan</text><text x="110" y="460" fill="#bfe9dd" font-size="26">Closest to campus · quiet · student life</text>
+<rect x="80" y="530" width="640" height="160" rx="18" fill="#21363d"/><text x="110" y="600" fill="#fff" font-size="36" font-weight="700">2 · Centre / Vieux-Marché</text><text x="110" y="650" fill="#bfe9dd" font-size="26">Historic · lively · one bus to NEOMA</text>
+<rect x="80" y="720" width="640" height="160" rx="18" fill="#21363d"/><text x="110" y="790" fill="#fff" font-size="36" font-weight="700">3 · Rive Gauche</text><text x="110" y="840" fill="#bfe9dd" font-size="26">Shops · metro · longer commute</text>
+</g></svg>

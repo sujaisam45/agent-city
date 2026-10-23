@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent City</title>
+<meta name="description" content="A living 3D Paris where a team of Cominty managed agents handles your move to France — every robot is a real agent step.">
+<link rel="icon" href="/assets/cominty-mark.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "/vendor/three.module.js",
+  "three/addons/": "/vendor/addons/"
+} }
+</script>
+<script src="/vendor/marked.min.js"></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="g-brand" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#2a6db3"/><stop offset="1" stop-color="#2fd5b5"/></linearGradient>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 7h3l2-3h8l2 3h3v13H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div id="city"></div>
+
+<!-- ============================================================ top bar -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32"><path d="M16 2l1.6 7h-3.2zM14.2 10h3.6l1.4 6h-6.4zM12.4 17h7.2l2.6 7h-3.4c-.6-1.8-1.6-3-2.8-3s-2.2 1.2-2.8 3H9.8z" fill="#fff"/><rect x="7" y="25" width="18" height="2.4" rx="1.2" fill="#fff" opacity=".85"/></svg>
+    </div>
+    <div class="brand-text">
+      <h1>Agent City</h1>
+      <p>Your move to France, handled by a team of AI agents</p>
+    </div>
+    <div class="built-on"><span>Built on</span><img src="/assets/cominty-logo.png" alt="Cominty"></div>
+  </div>
+
+  <div class="stats" id="stats">
+    <div><b id="st-agents">0</b><span>Agents out</span></div>
+    <div><b id="st-tools">0</b><span>Actions</span></div>
+    <div><b id="st-search">0</b><span>Searches</span></div>
+    <div><b id="st-files">0</b><span>Deliverables</span></div>
+    <div><b id="st-time">0:00</b><span>Elapsed</span></div>
+  </div>
+
+  <div class="top-actions">
+    <span id="mode" class="pill">Connecting…</span>
+    <div class="toolbar" role="toolbar" aria-label="View controls">
+      <button id="btn-director" class="on" type="button" title="Camera follows the agents"><svg><use href="#i-camera"/></svg><span>Follow</span></button>
+      <button id="btn-overview" type="button" title="Show the whole city"><svg><use href="#i-globe"/></svg><span>Overview</span></button>
+      <button id="btn-time" type="button" title="Change time of day"><svg><use href="#i-sun"/></svg><span>Golden hour</span></button>
+    </div>
+    <button id="btn-new" type="button" class="btn-ghost"><svg><use href="#i-plus"/></svg><span>New mission</span></button>
+  </div>
+</header>
+
+<div id="caption" class="caption"><span class="cap-tag"></span><span class="cap-text">Give the agents a mission. Watch them get it done.</span></div>
+
+<!-- ============================================================ side panel -->
+<aside class="panel">
+  <section class="mission">
+    <div class="sec-head">
+      <span class="eyebrow">Current mission</span>
+      <span id="mission-status" class="status idle">Idle</span>
+    </div>
+    <p id="mission-goal" class="mission-goal muted">No mission yet. Pick an example below or write your own.</p>
+    <ol class="steps" id="steps">
+      <li data-step="understand"><i>1</i><span>Understand</span></li>
+      <li data-step="research"><i>2</i><span>Research</span></li>
+      <li data-step="create"><i>3</i><span>Create</span></li>
+      <li data-step="review"><i>4</i><span>Review</span></li>
+      <li data-step="deliver"><i>5</i><span>Act &amp; deliver</span></li>
+    </ol>
+  </section>
+
+  <section class="crew">
+    <div class="sec-head"><span class="eyebrow">Agents on duty</span><span id="crew-n" class="count"></span></div>
+    <div id="crew"><span class="crew-rest">All agents are resting at the Eiffel Tower.</span></div>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button data-tab="log" class="on" role="tab">Activity</button>
+    <button data-tab="desk" role="tab">Deliverables <span id="desk-count" class="count"></span></button>
+    <button data-tab="memory" role="tab">Memory</button>
+  </nav>
+  <div class="tab on" id="tab-log"><ol id="log"></ol></div>
+  <div class="tab" id="tab-desk">
+    <div id="desk-empty" class="empty"><b>Nothing delivered yet</b>Plans, emails, images and calendar events made by the agents land here.</div>
+    <div id="desk"></div>
+    <div id="reply" class="reply"></div>
+  </div>
+  <div class="tab" id="tab-memory">
+    <div class="empty" id="mem-empty"><b>No memories yet</b>What the City Planner remembers about you (Cominty Memory) shows up here.</div>
+    <ul id="memory"></ul>
+  </div>
+</aside>
+
+<!-- ============================================================ bottom-left: replay + legend -->
+<div class="dock-left">
+  <div class="replaybar card" id="replaybar">
+    <div class="rb-title"><svg><use href="#i-play"/></svg><span>Watch a real recorded run</span></div>
+    <div class="rb-row">
+      <select id="rec" aria-label="Recorded run"></select>
+      <select id="speed" aria-label="Speed"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option></select>
+      <button id="play" type="button" class="btn-primary sm">Play</button>
+    </div>
+  </div>
+  <details class="legend card" id="legend" open>
+    <summary><svg><use href="#i-map"/></svg><span>How to read the city</span></summary>
+    <ul id="legend-list"></ul>
+  </details>
+</div>
+
+<!-- ============================================================ composer -->
+<form id="composer" class="composer">
+  <div class="chips" id="chips"></div>
+  <div class="row">
+    <textarea id="goal" rows="1" placeholder="Describe your mission — e.g. “Compare 3 neighbourhoods near my school and write to landlords.”"></textarea>
+    <button type="submit" id="go" class="btn-primary"><span>Send to the agents</span><svg><use href="#i-send"/></svg></button>
+  </div>
+</form>
+
+<!-- ============================================================ question card -->
+<div id="ask" class="ask" hidden>
+  <div class="ask-head">
+    <div class="ask-icon">?</div>
+    <div><b>The City Planner needs your input</b><span>Your answers change the plan. Agents wait until you reply.</span></div>
+  </div>
+  <div id="ask-qs"></div>
+  <div class="ask-foot"><button id="ask-send" type="button" class="btn-primary">Send answers</button></div>
+</div>
+
+<!-- ============================================================ file viewer -->
+<div id="viewer" class="viewer" hidden>
+  <div class="viewer-box">
+    <header><b id="viewer-title"></b><span><a id="viewer-dl" download class="btn-ghost sm">Download</a><button id="viewer-close" type="button" class="icon-btn" aria-label="Close">✕</button></span></header>
+    <div id="viewer-body"></div>
+  </div>
+</div>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>
