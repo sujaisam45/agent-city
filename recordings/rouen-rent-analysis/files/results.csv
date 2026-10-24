@@ -1,0 +1,11 @@
+label,value,unit
+Rouen (commune),15.38,EUR/m2/month
+Mont-Saint-Aignan,15.68,EUR/m2/month
+Bois-Guillaume,15.18,EUR/m2/month
+Deville-les-Rouen,14.9,EUR/m2/month
+Rouen Centre,,EUR/m2/month
+Rouen Rive Gauche,,EUR/m2/month
+studio_25m2_rent_Mont-Saint-Aignan,392.0,EUR/month
+studio_25m2_rent_Bois-Guillaume,379.5,EUR/month
+studio_25m2_rent_Deville-les-Rouen,372.5,EUR/month
+studio_25m2_rent_Rouen (commune),384.5,EUR/month

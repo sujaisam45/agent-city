@@ -248,16 +248,21 @@ function chartFromCSV(text) {
   for (let c = 1; c < head.length && vc < 0; c++) if (body.filter((r) => toNum(r[c]) !== null).length >= Math.max(1, body.length * 0.6)) vc = c;
   if (vc < 0) return null;
   const unitCol = head.findIndex((h) => /unit/i.test(h));
-  const data = body.filter((r) => toNum(r[vc]) !== null).map((r) => ({ label: r[0], value: toNum(r[vc]), unit: unitCol >= 0 ? r[unitCol] : '' })).sort((a, b) => b.value - a.value).slice(0, 14);
+  let data = body.filter((r) => toNum(r[vc]) !== null).map((r) => ({ label: String(r[0]).replace(/_/g, ' '), value: toNum(r[vc]), unit: unitCol >= 0 ? r[unitCol] : '' }));
+  // Mixed units (e.g. €/m² and €/month) can't share one axis: keep the largest unit group, first-listed on ties.
+  const groups = [];
+  for (const d of data) { let g = groups.find((x) => x.unit === d.unit); if (!g) groups.push(g = { unit: d.unit, rows: [] }); g.rows.push(d); }
+  if (groups.length > 1) data = groups.reduce((a, b) => (b.rows.length > a.rows.length ? b : a)).rows;
+  data = data.sort((a, b) => b.value - a.value).slice(0, 14);
   if (!data.length) return null;
   const max = Math.max(...data.map((d) => d.value)) || 1;
   const W = 520, lab = 150, rowH = 28, H = data.length * rowH + 30, bw = W - lab - 70;
-  const unit = data[0].unit || head[vc];
+  const unit = String(data[0].unit || head[vc]).replace(/EUR\s*/gi, '€').replace(/m2\b/g, 'm²');
   const bars = data.map((d, i) => {
     const y = 10 + i * rowH, w = Math.max(2, (d.value / max) * bw);
     return `<text x="${lab - 8}" y="${y + 17}" text-anchor="end" class="ch-l">${esc(d.label).slice(0, 22)}</text>
       <rect x="${lab}" y="${y + 4}" width="${w}" height="${rowH - 10}" rx="5" class="${i === 0 ? 'ch-b top' : 'ch-b'}"/>
-      <text x="${lab + w + 6}" y="${y + 17}" class="ch-v">${d.value.toLocaleString('en-GB')}</text>`;
+      <text x="${lab + w + 6}" y="${y + 17}" class="ch-v">${d.value.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</text>`;
   }).join('');
   return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="${esc(head[vc])} by ${esc(head[0])}">${bars}<text x="${lab}" y="${H - 4}" class="ch-u">${esc(unit)}</text></svg>`;
 }
@@ -427,7 +432,14 @@ function handle(ev) {
   switch (ev.type) {
     case 'run_started':
       S.turn = (S.turn || 0) + 1; // Cominty restarts step ids every turn
-      if (ev.agent) setLeadLabel(ev.agent);
+      if (ev.agent) {
+        setLeadLabel(ev.agent);
+        if (AGENT_LABEL[ev.agent] && S.agent !== ev.agent) { // follow-ups go to the agent that ran this thread
+          S.agent = ev.agent;
+          document.querySelectorAll('#agent-pick button').forEach((b) => b.classList.toggle('on', b.dataset.agent === ev.agent));
+          renderChips();
+        }
+      }
       S.threadId = ev.thread_id;
       setMode(ev.mode);
       setStatus('working'); setStep('understand');
