@@ -42,7 +42,8 @@ function classify(tool = '', text = '') {
   const t = tool.toLowerCase();
   const s = `${t} ${text.toLowerCase()}`;
   if (/sub.?agent|delegat|spawn|handoff|workflow|phase|second.?opinion|^task$|^agent/.test(t) || /^(researcher|reviewer)\b/i.test(text)) {
-    if (/review|check|verif|opinion|critic|audit/.test(s)) return { role: 'Reviewer', building: 'townhall', sub: true };
+    const d = text.toLowerCase().trim(); // "save verified figures" is research, "verify the figures" is review
+    if (/review|opinion|critic|audit|fact.?check|proofread/.test(d) || /^(check|verify|validate|double.?check)\b/.test(d)) return { role: 'Reviewer', building: 'townhall', sub: true };
     if (/calendar|event|invite|notion|slack|integration/.test(s)) return { role: 'Operator', building: 'workshop', sub: true };
     if (/analy|compute|calculat|statistic|dataset|chart/.test(s)) return { role: 'Analyst', building: 'observatory', sub: true };
     return { role: 'Researcher', building: 'library', sub: true };
